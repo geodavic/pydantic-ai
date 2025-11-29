@@ -354,7 +354,10 @@ class Agent(AbstractAgent[AgentDepsT, OutputDataT]):
 
         self._max_result_retries = output_retries if output_retries is not None else retries
         self._max_tool_retries = retries
+<<<<<<< HEAD
         self._tool_timeout = tool_timeout
+=======
+>>>>>>> bdcbb3ab (DouweM feedback)
 
         self._validation_context = validation_context
 

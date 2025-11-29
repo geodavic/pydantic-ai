@@ -36,7 +36,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.output import ToolOutput
 from pydantic_ai.tools import DeferredToolRequests, DeferredToolResults, ToolApproved, ToolDefinition, ToolDenied
-from pydantic_ai.usage import RequestUsage
+from pydantic_ai.usage import RequestUsage, RunUsage
 
 from .conftest import IsDatetime, IsStr
 
@@ -2284,6 +2284,40 @@ async def test_approval_required_toolset():
         ]
     )
     assert result.output == snapshot('Done!')
+
+
+async def test_approval_required_toolset_marks_tool_kind():
+    toolset = FunctionToolset[None]()
+
+    run_context = RunContext(
+        deps=None,
+        model=TestModel(),
+        usage=RunUsage(),
+        prompt=None,
+        messages=[],
+        run_step=0,
+    )
+
+    @toolset.tool
+    def foo(x: int) -> int:
+        return x * 2  # pragma: no cover
+
+    @toolset.tool
+    def bar(x: int) -> int:
+        return x * 3  # pragma: no cover
+
+    toolset_all_approval = toolset.approval_required()
+    tools = await toolset_all_approval.get_tools(run_context)
+    assert tools['foo'].tool_def.kind == 'unapproved'
+    assert tools['bar'].tool_def.kind == 'unapproved'
+
+    toolset_foo_approval = toolset.approval_required(lambda ctx, tool_def, tool_args: tool_def.name == 'foo')
+    tools = await toolset_foo_approval.get_tools(run_context)
+    assert tools['foo'].tool_def.kind == 'unapproved'
+    assert tools['bar'].tool_def.kind == 'function'
+
+    with pytest.raises(ApprovalRequired):
+        _ = await toolset_all_approval.call_tool('foo', {'x': 2}, run_context, tools['foo'])
 
 
 def test_deferred_tool_results_serializable():
